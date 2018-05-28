@@ -1,0 +1,119 @@
+压入元素：
+Void lua_push* (lua_State *L);
+查询元素
+lua_to * （lua_State *L, int index）;
+const char* lua_tolstring(lua_State *L, int index, size_t *len)
+lua_type
+lua_tolstring 函数返回一个指向内部字符串副本的指针，并将字符串的长度存入最后一个参数len中。Lua保证只要这个对应的字符串值还在栈中，那么这个指针就是有效的。当Lua调用了
+不要在C函数之外使用在C函数内获得的指向Lua字符串的指针
+其他栈操作：
+Int lua_gettop(lua_State *L); 返回栈顶元素
+void lua_settop(lua_State *L, int index);   将栈顶设置为一个指定的位置
+void lua_pushvalue(lua_State*L, int index); 指定索引上值的副本压入栈中
+void lua_remove (lua_State *L, int index); 删除指定索引上的元素，栈所有元素下移一填补空缺。
+void lua_insert(lua_State *L, int index); 上移指定位置之上的所有元素开辟一个槽空间，然后将栈顶元素移动到该位置。
+void lua_replace (lua_State *L, int index); 弹出栈顶元素，并将改制设置到指定索引上。
+
+C API的错误处理
+当编写库代码（被lua调用的C函数）时，使用longjmp几乎和使用异常处理机制一样方便，Lua会捕获所有可能的错误。而当编写应用程序代码（调用Lua的C代码）时，必须提供一种捕获错误的方式。
+
+应用程序代码中的错误处理
+调用lua_pcall来运行Lua代码。因而这些lua代码也都是运行在保护模式中的。如果发生了内存分配的错误，lua_pcall会返回一个错误代码，并将解释器封固在一致的状态。如果要保护那些与lua交互的C代码，使用lua_cpall。
+
+库代码的错误处理
+当一个C函数检测到一个错误时，它就应该调用lua_error。lua_error函数会清理lua中所有需要清理的东西，然后跳转回发起执行的那个lua_pcall，并附上一条错误信息。
+
+调用Lua函数
+调用函数的API协议很简单。首先，将待调用的函数压入栈，并压入函数的参数。然后，使用lua_pcall进行实际的调用。最后，将调用结果从栈中弹出。
+
+一个通用的调用函数
+p228
+
+从Lua调用C
+对于一个能被Lua调用的C函数，它必须遵循一个获取一个参数和返回结果的协议。此外，还必须注册C函数，以便用某种适当的方式将函数地址告诉Lua。也使用了一个与C语言调用Lua时相同的栈。
+
+
+如果发生内存不足，一个程序所能做的最佳处理就是结束运行。
+
+C模块
+Lua通过注册过程记录下C函数，然后使用这些函数地址直接调用它。
+一个为Lua编写的C模块可以模仿Lua的用table存储函数的行为。除了C函数的定义外，C模块还必须定义一个特殊的函数，这个函数相当于一个Lua模块中的主程序块。它应该注册模块中所有的C函数，并将它们存储在一个适当的地方。并且，这个函数还应初始化模块中所有需要初始化的东西。
+
+编写C函数的技术
+
+数组操作
+
+
+void lua_rawgeti(lua_State *L, int index, int key);
+void lua_rawseti(lua_State *L, int index, int key);
+
+字符串操作
+当一个C函数从Lua收到一个字符串参数时，必须遵守两条规则：不要在访问字符串时从栈中弹出它，不要修改字符串。
+
+lua_pushlstring(L, s + i, j - i +1); 提取一个字符串s的字串（区间为[i, j]）传递给Lua。
+lua_concat(L, n) 连接并弹出栈顶的n个值，然后压入结果。
+const char* lua_pushfstring(lua_State *L,  const char *fmt,  ...); 根据一个格式字符串和一些额外的参数来创建一个新的字符串。
+
+
+第一层类似于I/O操作中缓冲，就是一个本地缓冲中收集较小的字符串，并在本地缓冲填满之后将结果传递给Lua。
+第二层使用lua_concat或其他的栈算法来连接多次缓冲填满后的结果。
+
+ void luaL_buffinit (lua_State *L, luaL_Buffer *B);
+初始化缓冲
+ void luaL_addchar (luaL_Buffer *B, char c);
+ void lual_addlstring (luaL_Buffer *B, const char *s, siz_t l);
+ void luaL_addstring (luaL_Buffer *B, const char *s);
+向缓冲添加字符串或者字符
+ void luaL_pushresult (luaL_Buffer *B);
+更新缓冲，并将最终的字符串留在栈顶。
+void luaL_addvalue (luaL_Buffer *B);  
+将栈顶的值加入缓冲
+在C函数中保存状态
+对于lua函数来说，有3中地方可以存放费局部的数据，它们时全局变量，函数环境和非局部变量（closure）中。
+
+C API提供3种地方来保存状态：注册表、环境、和upvalue
+
+注册表
+注册表总是位于一个 “伪索引”上，伪索引就像是一个栈中的索引，但它所关联的值不在栈中。
+
+lua_getfield(L, LUA_REGISRYINDEX, “Key”);
+
+注册表是一个普通的lua table, 可以用任何Lua值来索引它。所有的C模块共享同一个注册表，为了避免冲突，必须谨慎地选择key的值。  
+
+通用唯一标识符
+
+在注册表中不应使用数学类型的key， 因为这种key是被“引用系统”所保留的 。这个系统是辅助库的一系列函数组成，它可以在向一个table存储value时，忽略如何创建唯一的key。
+
+luaL_ref(L, LUA_REGISTRYINDEX); 创建唯一的key。
+
+会从栈中弹出一个值，然后用一个新分配的整数key来将这个值保存到注册表中，最后返回这个整数key。这个key被称为“引用”。
+
+释放值和引用:  lual_unref(L,  LUA_REGISTRYINDEX, r);
+
+另一种创建注册表key的方法是，使用代码中静态变量的地址，C连接器可以确保这种key在所有库中的唯一性。 
+
+C函数的环境
+在Lua中注册的所有C函数都有自己的环境table。一个函数可以像访问注册表那样，通过一个伪索引来访问它的环境table。环境table的伪索引是LUA_ENVIRONINDEX
+使用这些环境的方法与在Lua模块中使用环境的方法差不多。就是为模块创建一个新的table，然后使模块中的所有函数都共享这个table。
+
+int luaopen_foo(lua_State *L) {
+	lua_newtable(L);
+	lua_replace(L, LUA_ENVIRONINDEX);
+	luaL_register(L, <库名>, <函数列表>)
+}
+
+upvalue
+upvalue机制则实现了一种类似于C语言中静态变量的机制，这种变量只在一个特定的函数可见。
+
+
+
+
+
+
+
+
+
+
+
+
+
