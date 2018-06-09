@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 https://github.com/cloudwu/skynet/wiki/GettingStarted
 
 http://www.cnblogs.com/rainman/archive/2013/05/06/3063925.html
@@ -28,3 +29,6 @@ http://www.cnblogs.com/yc_sunniwell/archive/2010/07/14/1777431.html
 https://www.cnblogs.com/skynet/archive/2010/07/10/1774964.html
 
 https://blog.csdn.net/elfprincexu/article/details/51942421
+=======
+# skynet 
+>>>>>>> fa5c8dd42f072b0778ec2e2927dc18bd6dda58c5
